@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#0a0a0a">
+<style>
+/* ===== Witcher palette + compact Obsidian-like layout ===== */
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;display:flex;overflow:hidden;background:#0a0a0a;color:#d4c5a0;font-family:'Crimson Text',serif}
+
+/* Sidebar */
+.sidebar{width:300px;max-width:40vw;display:flex;flex-direction:column;background:#0b0b0b;border-right:1px solid rgba(70,60,40,.6)}
+.header{display:flex;align-items:center;gap:.5rem;padding:.6rem .8rem;border-bottom:1px solid rgba(70,60,40,.6)}
+.title{font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:.18em;color:#c9b896;font-weight:700}
+.ctrls{margin-left:auto;display:flex;gap:.35rem;flex-wrap:wrap}
+.btn{background:rgba(80,60,40,.25);border:1px solid rgba(120,90,60,.45);color:#c9b896;padding:.32rem .55rem;border-radius:.35rem;cursor:pointer;font-family:'Cinzel',serif;font-size:.78rem;letter-spacing:.05em}
+.btn:hover{background:rgba(100,75,50,.35);border-color:rgba(150,120,80,.7)}
+.search{padding:.5rem .75rem;border-bottom:1px solid rgba(70,60,40,.6)}
+.search input{width:100%;padding:.4rem .55rem;background:rgba(0,0,0,.35);border:1px solid rgba(100,80,60,.4);color:#d4c5a0}
+.search input:focus{outline:0;border-color:rgba(150,120,80,.65)}
+.tree{flex:1;overflow:auto;padding:.5rem .5rem .8rem}
+
+/* Section group (top-level folder) */
+.group{border:1px solid rgba(70,60,40,.6);border-radius:0;overflow:hidden;background:#0b0b0b;margin-bottom:.5rem}
+.group-head{display:flex;align-items:center;gap:.45rem;padding:.5rem .6rem;border-bottom:1px solid rgba(70,60,40,.6);cursor:pointer}
+.group-name{font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:.10em;color:#e9d69f;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.group.collapsed>.group-body{display:none}
+.group-body{padding:.25rem .25rem}
+
+/* Tree nodes (aligned left, no icons) */
+ul,li{margin:0;padding:0;list-style:none}
+.node{display:flex;align-items:center;gap:.40rem;padding:.18rem .35rem .18rem .35rem;border-left:2px solid transparent;user-select:none}
+.node:hover{background:rgba(40,35,30,.35);border-left-color:rgba(150,120,80,.5)}
+.node.active{background:rgba(50,40,30,.6);border-left-color:#c9b896;color:#c9b896}
+.t{width:0;height:0;border-left:5px solid #8a7a5a;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:.15s;margin-right:.1rem}
+.collapsed>.t{transform:rotate(-90deg)}
+.name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* tighter nesting */
+.children{margin-left:.55rem;max-height:999px;overflow:hidden;transition:max-height .2s}
+.collapsed>.children{max-height:0}
+
+/* Main/editor */
+.main{flex:1;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;justify-content:space-between;padding:.55rem .9rem;border-bottom:1px solid rgba(70,60,40,.6);background:#0b0b0b}
+.pageTitle{font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:.12em;color:#c9b896;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Fixed-size toolbar buttons */
+.tools{display:flex;gap:.2rem;align-items:center;flex-wrap:wrap}
+.tbtn{width:26px;height:24px;display:inline-flex;align-items:center;justify-content:center;background:rgba(80,60,40,.25);border:1px solid rgba(120,90,60,.45);border-radius:.25rem;color:#c9b896;cursor:pointer;font-family:'Cinzel',serif;font-size:.72rem;user-select:none;line-height:1}
+.tbtn:hover{background:rgba(100,75,50,.35);border-color:rgba(150,120,80,.7)}
+
+/* Editor area (deeper black) */
+.editor{
+  flex:1; overflow:auto; padding:1rem 0; background:#0a0a0a; color:#d4c5a0;
+}
+.editor:focus{outline:none}
+
+/* Centered finite page - smaller width, smaller text, tighter line spacing */
+.editor .page{
+  max-width: 720px; margin: 0 auto; padding: 0 1.1rem; line-height:1.4; font-size:0.8rem;
+}
+.editor > .page:empty::before{ content:""; }
+
+/* Real headings: dark orange, not bold, smaller sizes, collapsible - NO ARROWS FOR NOW */
+.editor h1{font-size:1.44rem;margin:.45rem 0 .25rem 0;padding:0;font-weight:400;cursor:pointer;user-select:none}
+.editor h2{font-size:1.28rem;margin:.40rem 0 .22rem 0;padding:0;font-weight:400;cursor:pointer;user-select:none}
+.editor h3{font-size:1.08rem;margin:.36rem 0 .20rem 0;padding:0;font-weight:400;cursor:pointer;user-select:none}
+.editor h4{font-size:.96rem; margin:.32rem 0 .18rem 0;padding:0;font-weight:400;cursor:pointer;user-select:none}
+.editor h5{font-size:.84rem; margin:.28rem 0 .16rem 0;padding:0;font-weight:400;cursor:pointer;user-select:none}
+.editor h1,.editor h2,.editor h3,.editor h4,.editor h5{
+  font-family:'Cinzel',serif;letter-spacing:.06em;text-transform:uppercase;color:#d9742e
+}
+
+/* Images: themed frame + default right wrap */
+.editor img{max-width:100%;height:auto;border:1px solid rgba(150,120,80,.65);background:#111;padding:.25rem;border-radius:.35rem;box-shadow:0 6px 16px #0006;}
+.editor img.img-framed{ float:right; margin:.35rem 0 .5rem .8rem; shape-outside: margin-box; }
+.editor img.left{ float:left; margin:.35rem .8rem .5rem 0; }
+
+/* Inline search highlight */
+.hl{ background:#614a21; outline:1px solid rgba(200,160,90,.6); }
+
+/* Backlinks panel */
+.backlinks{border-top:1px solid rgba(70,60,40,.6);background:#0b0b0b;}
+.backlinks .bl-head{font-family:'Cinzel',serif;text-transform:uppercase;letter-spacing:.08em;color:#e9d69f;padding:.5rem 1rem;border-bottom:1px solid rgba(70,60,40,.6)}
+.backlinks .bl-body{padding:.6rem 1rem 1rem;max-height:26vh;overflow:auto}
+.backlinks .bl-item{padding:.25rem 0;border-bottom:1px dashed rgba(120,90,60,.35);cursor:pointer}
+.backlinks .bl-item:last-child{border-bottom:0}
+.backlinks .bl-item .bl-title{color:#d9a45c}
+.backlinks .bl-item .bl-snippet{color:#bdae8b;font-size:.92rem}
+
+/* Map banner (full width inside page) */
+.map-banner{width:100%;margin:.6rem 0 1rem;border:1px solid rgba(150,120,80,.7);border-radius:.35rem;overflow:hidden;background:#0f0f0f}
+.map-banner img{display:block;width:100%;height:auto;border:0;padding:0;box-shadow:none}
+.map-banner figcaption{padding:.4rem .6rem;color:#c9b896;font-size:.9rem;border-top:1px solid rgba(70,60,40,.6)}
+
+/* Tables */
+.editor table.tbl{border-collapse:collapse;margin:.6rem 0;width:100%;max-width:100%;font-size:.9rem;line-height:1.35}
+.editor table.tbl th,.editor table.tbl td{border:1px solid rgba(120,90,60,.45);padding:.25rem .4rem;vertical-align:top}
+.editor table.tbl thead th{background:#141313;color:#e9d69f;font-family:'Cinzel',serif;letter-spacing:.05em;text-transform:uppercase;font-size:.8rem;padding:.22rem .38rem}
+
+/* Custom context menu */
+.cmenu{position:fixed;z-index:9999;background:#111;border:1px solid rgba(150,120,80,.7);border-radius:.35rem;min-width:160px;box-shadow:0 10px 24px #0008;display:none}
+.cmenu button{display:block;width:100%;text-align:left;background:transparent;color:#d4c5a0;border:0;padding:.5rem .7rem;cursor:pointer}
+.cmenu button:hover{background:rgba(100,75,50,.35)}
+
+/* Inline cross-links + header jumps */
+.xref{color:#d9a45c;cursor:pointer;border-bottom:1px dashed rgba(200,160,90,.25)}
+.xref:hover{color:#f0ba6b;border-bottom-color:rgba(200,160,90,.45)}
+.hjump{color:#d9a45c;cursor:pointer}
+.hjump:hover{color:#f0ba6b}
+
+/* Page name highlight (not yet a link) */
+.page-match{color:#8b6914;background:rgba(139,105,20,.15)}
+
+/* Callout boxes */
+.callout{
+  border-left:2px solid;
+  padding:.25rem .4rem;
+  margin:.3rem 0;
+  border-radius:.2rem;
+  font-size:.75rem;
+  line-height:1.25;
+}
+.callout::before{
+  font-weight:600;
+  display:block;
+  margin-bottom:.15rem;
+  font-family:'Cinzel',serif;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  font-size:.7rem;
+}
+
+.callout-clue{
+  background:rgba(100,149,237,.08);
+  border-left-color:#6495ed;
+}
+.callout-clue::before{
+  content:'🔍 Clue';
+  color:#6495ed;
+}
+.callout-question{
+  background:rgba(255,165,0,.08);
+  border-left-color:#ffa500;
+}
+.callout-question::before{
+  content:'❓ Question';
+  color:#ffa500;
+}
+.callout-observe{
+  background:rgba(144,238,144,.08);
+  border-left-color:#90ee90;
+}
+.callout-observe-header{
+  display:flex;
+  align-items:center;
+  gap:.4rem;
+  margin-bottom:.2rem;
+}
+.callout-observe-header::before{
+  content:'👁️ Observe';
+  color:#90ee90;
+  font-weight:600;
+  font-family:'Cinzel',serif;
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  font-size:.75rem;
+}
+.callout-observe-dc{
+  color:#90ee90;
+  font-size:.7rem;
+  font-family:'Cinzel',serif;
+  padding:.1rem .3rem;
+  background:rgba(144,238,144,.15);
+  border-radius:.2rem;
+  border:1px solid rgba(144,238,144,.3);
+}
+
+/* Skill Challenge Template */
+.skill-challenge{
+  border:1px solid rgba(150,120,80,.6);
+  border-radius:.25rem;
+  padding:.35rem;
+  margin:.3rem 0;
+  background:rgba(20,15,10,.4);
+}
+.sc-title{
+  font-family:'Cinzel',serif;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#e9d69f;
+  font-size:.8rem;
+  margin-bottom:.3rem;
+  text-align:center;
+}
+
+.sc-counters{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.4rem;
+  margin-bottom:.4rem;
+}
+.sc-counter{
+  text-align:center;
+  padding:.25rem;
+  background:rgba(0,0,0,.3);
+  border:1px solid rgba(120,90,60,.4);
+  border-radius:.2rem;
+}
+.sc-counter-label{
+  font-family:'Cinzel',serif;
+  font-size:.7rem;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:#c9b896;
+  margin-bottom:.1rem;
+}
+.sc-counter-value{
+  font-size:1rem;
+  color:#d9a45c;
+  font-weight:600;
+}
+.sc-skills{
+  margin:.4rem 0;
+}
+.sc-skill-row{
+  display:grid;
+  grid-template-columns:100px 1fr;
+  gap:.4rem;
+  padding:.25rem .3rem;
+  border-bottom:1px dashed rgba(120,90,60,.3);
+  align-items:start;
+}
+.sc-skill-row:last-child{
+  border-bottom:0;
+}
+.sc-skill-name{
+  font-family:'Cinzel',serif;
+  font-size:.75rem;
+  color:#d9a45c;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+}
+.sc-skill-desc{
+  font-size:.75rem;
+  line-height:1.3;
+}
+.sc-outcome{
+  margin-top:.4rem;
+  padding:.3rem .4rem;
+  background:rgba(0,0,0,.25);
+  border-radius:.2rem;
+  border-left:3px solid;
+}
+
+
+/* NPC Template */
+.npc-card{
+  border:1px solid rgba(150,120,80,.6);
+  border-radius:.25rem;
+  padding:.3rem .35rem;
+  margin:.3rem 0;
+  background:rgba(20,15,10,.4);
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:.5rem;
+  align-items:start;
+}
+.npc-name{
+  font-family:'Cinzel',serif;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:#e9d69f;
+  font-size:.7rem;
+  padding-top:.1rem;
+  white-space:nowrap;
+}
+
+.npc-quotes{
+  list-style:none;
+  margin:0;
+  padding:0;
+}
+.npc-quotes li{
+  position:relative;
+  padding:.25rem .3rem .25rem 1.3rem;
+  margin:.2rem 0;
+  background:rgba(100,75,50,.15);
+  border-radius:.2rem;
+  font-size:.75rem;
+  line-height:1.3;
+}
+.npc-quotes li::before{
+  content:'💬';
+  position:absolute;
+  left:.3rem;
+  top:.25rem;
+  font-size:.7rem;
+}
+
+/* Combat Encounter Template */
+.combat-encounter{
+  border:1px solid #c44;
+  border-radius:.25rem;
+  padding:.35rem;
+  margin:.3rem 0;
+  background:rgba(50,15,15,.4);
+}
+.combat-title{
+  font-family:'Cinzel',serif;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+  color:#ff6b6b;
+  font-size:.8rem;
+  margin-bottom:.25rem;
+}
+.combat-flavor{
+  font-style:italic;
+  font-size:.75rem;
+  line-height:1.3;
+  color:#ddd;
+  padding:.25rem .3rem;
+  background:rgba(0,0,0,.2);
+  border-radius:.2rem;
+  margin-bottom:.3rem;
+  border-left:2px solid rgba(255,107,107,.3);
+}
+.combat-section-label{
+  font-family:'Cinzel',serif;
+  font-size:.7rem;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+  color:#ff9999;
+  margin:.3rem 0 .15rem;
+}
+.combat-enemies{
+  font-size:.75rem;
+  line-height:1.3;
+  padding:.2rem .3rem;
+  background:rgba(0,0,0,.15);
+  border-radius:.2rem;
+}
+.combat-rounds{
+  font-size:.75rem;
+  line-height:1.3;
+  padding:.2rem .3rem;
+  background:rgba(0,0,0,.15);
+  border-radius:.2rem;
+}
+
+/* Loot Table Template */
+.loot-table{
+  border:1px solid rgba(150,120,80,.6);
+  border-radius:.25rem;
+  padding:.35rem;
+  margin:.3rem 0;
+  background:rgba(20,15,10,.4);
+}
+.loot-title{
+  font-family:'Cinzel',serif;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#e9d69f;
+  font-size:.8rem;
+  margin-bottom:.3rem;
+  text-align:center;
+}
+.loot-row{
+  display:grid;
+  grid-template-columns:50px 1fr 1.5fr;
+  gap:.3rem;
+  padding:.2rem .25rem;
+  border-bottom:1px dashed rgba(120,90,60,.3);
+  align-items:start;
+  font-size:.75rem;
+}
+.loot-row:last-child{
+  border-bottom:0;
+}
+.loot-roll{
+  font-family:'Cinzel',serif;
+  color:#d9a45c;
+  font-size:.7rem;
+  text-align:center;
+}
+.loot-item{
+  color:#c9b896;
+  font-weight:600;
+}
+.loot-desc{
+  color:#bdae8b;
+  line-height:1.3;
+}
+
+/* Encounter Table Template */
+.encounter-table{
+  border:1px solid rgba(150,120,80,.6);
+  border-radius:.25rem;
+  padding:.35rem;
+  margin:.3rem 0;
+  background:rgba(20,15,10,.4);
+}
+.encounter-title{
+  font-family:'Cinzel',serif;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#e9d69f;
+  font-size:.8rem;
+  margin-bottom:.3rem;
+  text-align:center;
+}
+.encounter-row{
+  display:grid;
+  grid-template-columns:50px 1fr;
+  gap:.3rem;
+  padding:.2rem .25rem;
+  border-bottom:1px dashed rgba(120,90,60,.3);
+  align-items:start;
+  font-size:.75rem;
+}
+.encounter-row:last-child{
+  border-bottom:0;
+}
+.encounter-roll{
+  font-family:'Cinzel',serif;
+  color:#d9a45c;
+  font-size:.7rem;
+  text-align:center;
+}
+.encounter-desc{
+  color:#bdae8b;
+  line-height:1.3;
+}
+
+/* Delete button for templates */
+.template-delete{
+  position:absolute;
+  top:2px;
+  right:2px;
+  width:16px;
+  height:16px;
+  background:#c44;
+  border:1px solid #a33;
+  border-radius:3px;
+  color:#fff;
+  font-size:11px;
+  line-height:14px;
+  text-align:center;
+  cursor:pointer;
+  opacity:0;
+  transition:opacity .2s;
+  user-select:none;
+  z-index:10;
+}
+.template-delete:hover{
+  background:#d55;
+}
+.skill-challenge, .combat-encounter, .loot-table, .encounter-table, .npc-card, .callout{
+  position:relative;
+}
+.skill-challenge:hover .template-delete,
+.combat-encounter:hover .template-delete,
+.loot-table:hover .template-delete,
+.encounter-table:hover .template-delete,
+.npc-card:hover .template-delete,
+.callout:hover .template-delete{
+  opacity:1;
+}
+
+/* Hover popout preview */
+.preview{position:fixed;z-index:9999;max-width:420px;max-height:340px;overflow:auto;background:#101010;border:1px solid rgba(150,120,80,.7);border-radius:.35rem;padding:.6rem .7rem;box-shadow:0 10px 24px #0008;display:none}
+.preview h1,.preview h2,.preview h3{font-size:.95rem;margin:.2rem 0 .15rem}
+.preview p{margin:.25rem 0;font-size:.9rem;line-height:1.35}
+
+/* Drag & drop cue */
+.node.drop-target{outline:1px dashed rgba(200,160,90,.6);background:rgba(90,70,50,.25)}
+
+/* scrollbars */
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#1c212b;border-radius:6px;border:2px solid #0b0b0b}::-webkit-scrollbar-track{background:#0b0b0b}
+@media(max-width:900px){.sidebar{width:260px}}
+</style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="header">
+      <div class="title">Journal</div>
+      <div class="ctrls">
+        <button class="btn" id="addSection">+ Section</button>
+        <button class="btn" id="globalReplace">Replace…</button>
+      </div>
+    </div>
+    <div class="search">
+      <input id="q" placeholder="Search titles…  (Use Enter to find in page)">
+      <div style="display:flex;gap:.35rem;margin-top:.35rem">
+        <button class="btn" id="findPrev" title="Previous match">Prev</button>
+        <button class="btn" id="findNext" title="Next match">Next</button>
+      </div>
+    </div>
+    <div class="tree" id="tree"></div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div class="pageTitle" id="pageTitle">No page</div>
+      <div class="tools">
+        <button class="tbtn" data-cmd="bold">B</button>
+        <button class="tbtn" data-cmd="italic">I</button>
+        <button class="tbtn" data-cmd="underline">U</button>
+        <button class="tbtn" id="dot">.</button>
+        <button class="tbtn" data-h="H1">H1</button>
+        <button class="tbtn" data-h="H2">H2</button>
+        <button class="tbtn" data-h="H3">H3</button>
+        <button class="tbtn" data-h="H4">H4</button>
+        <button class="tbtn" data-h="H5">H5</button>
+        <button class="tbtn" id="tableBtn">T</button>
+<button class="tbtn" id="clueBtn" title="Clue callout">🔍</button>
+<button class="tbtn" id="questionBtn" title="Question callout">❓</button>
+<button class="tbtn" id="observeBtn" title="Observe callout">👁️</button>
+<button class="tbtn" id="scBtn" title="Skill Challenge">SC</button>
+<button class="tbtn" id="npcBtn" title="NPC Card">NPC</button>
+<button class="tbtn" id="combatBtn" title="Combat Encounter">⚔️</button>
+<button class="tbtn" id="lootBtn" title="Loot Table">💰</button>
+<button class="tbtn" id="encounterBtn" title="Encounter Table">🎲</button>
+      </div>
+    </div>
+
+    <div id="ed" class="editor">
+      <div id="pad" class="page" contenteditable="true" spellcheck="true">
+        <h2>Welcome</h2><div class="rule"></div>
+        <p>Create <em>Sections</em> (top level), then right-click a Section to add a <strong>Folder</strong>, and right-click a Folder to add a <strong>Page</strong>. Right-click anything to <strong>Rename</strong> or <strong>Delete</strong>. Toolbar buttons are fixed size. Only the page title shows above the editor.</p>
+      </div>
+    </div>
+
+    <!-- Backlinks panel -->
+    <div id="backlinks" class="backlinks" aria-live="polite">
+      <div class="bl-head">Backlinks</div>
+      <div id="backlinksBody" class="bl-body"><em>No backlinks.</em></div>
+    </div>
+  </main>
+
+  <!-- Custom context menu -->
+  <div id="cmenu" class="cmenu" role="menu" aria-hidden="true"></div>
+  <div id="preview" class="preview" role="dialog" aria-hidden="true"></div>
+
+<script>
+/* ---------- Compact vault (sections, folders, pages) ---------- */
+const KEY='journal.tree.v3', SEL='journal.sel.v3', CT='journal.content.v3';
+const ed=$('#pad'), treeEl=$('#tree'), titleEl=$('#pageTitle'), q=$('#q'), menu=$('#cmenu');
+let vault=load(KEY)||root(); let sel=load(SEL)||null, filter='';
+let dirHandle=null;
+const previewEl = $('#preview');
+let previewTimer = null;
+
+// search & replace controls
+const findPrevBtn = $('#findPrev');
+const findNextBtn = $('#findNext');
+const replaceBtn  = $('#globalReplace');
+
+// in-page find state
+let findMatches = [];
+let findIndex = -1;
+
+function $(q){return document.querySelector(q)}
+function root(){return {id: id(), type:'root', name:'Vault', children:[]}}
+function id(){return Math.random().toString(36).slice(2,9)}
+function saveAll(){localStorage.setItem(KEY,JSON.stringify(vault))}
+function load(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}}
+function getContent(i){return localStorage.getItem(CT+':'+i)||''}
+function setContent(i,html){localStorage.setItem(CT+':'+i,html)}
+function setSel(i){sel=i; localStorage.setItem(SEL,JSON.stringify(sel))}
+
+/* ---- disk save helpers (optional folder export) ---- */
+function slug(s){ return (s||'page').toLowerCase().trim().replace(/[^\w\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').slice(0,80) || 'page'; }
+async function ensurePermission(handle, mode='readwrite'){ if(!handle) return false; const q=await handle.queryPermission({mode}); if(q==='granted') return true; const r=await handle.requestPermission({mode}); return r==='granted'; }
+function htmlToText(html){ const el=document.createElement('div'); el.innerHTML=html; const blocks='p,div,section,article,header,footer,li,ul,ol,pre,blockquote,h1,h2,h3,h4,h5,h6,table,tr'.split(','); blocks.forEach(sel=> el.querySelectorAll(sel).forEach(n=>{ if(n!==el){ n.insertAdjacentText('beforebegin','\\n'); n.insertAdjacentText('afterend','\\n'); }})); el.querySelectorAll('br').forEach(br=> br.replaceWith('\\n')); let txt = el.textContent || ''; return txt.replace(/\\r/g,'').replace(/\\n{3,}/g,'\\n\\n').trimEnd(); }
+async function promptForFolderOnce(){ if(dirHandle || !('showDirectoryPicker' in window)) return; try{ dirHandle = await window.showDirectoryPicker({ id:'journal-root' }); await idbSet('dirHandle', dirHandle); if(navigator.storage && navigator.storage.persist) try{ await navigator.storage.persist(); }catch{} }catch(e){} }
+async function savePageTxt(page){ try{ if(!dirHandle) return; if(!(await ensurePermission(dirHandle,'readwrite'))) return; const name = slug(page.name)+'.txt'; const fh = await dirHandle.getFileHandle(name, { create:true }); const w = await fh.createWritable(); const txt = htmlToText(getContent(page.id)); await w.write(new Blob([txt], {type:'text/plain'})); await w.close(); }catch(e){ console.warn('Disk save failed:', e); } }
+async function deletePageTxt(page){ try{ if(!dirHandle || !dirHandle.removeEntry) return; if(!(await ensurePermission(dirHandle,'readwrite'))) return; await dirHandle.removeEntry(slug(page.name)+'.txt'); }catch(e){} }
+
+// IndexedDB to remember folder handle
+const DB_NAME='journal-db', STORE='handles';
+function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME,1); r.onupgradeneeded=()=>r.result.createObjectStore(STORE); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbGet(k){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction(STORE); const g=t.objectStore(STORE).get(k); g.onsuccess=()=>res(g.result); g.onerror=()=>rej(g.error); }); }
+async function idbSet(k,v){ const db=await idb(); return new Promise((res,rej)=>{ const t=db.transaction(STORE,'readwrite'); const p=t.objectStore(STORE).put(v,k); p.onsuccess=()=>res(); p.onerror=()=>rej(p.error); }); }
+(async ()=>{ try{ const h = await idbGet('dirHandle'); if(h && (await h.queryPermission({mode:'readwrite'}))==='granted'){ dirHandle=h; } }catch(e){} })();
+
+/* ---- find/parent helpers ---- */
+function findNode(node, id){ if(!node) return null; if(node.id===id) return node; for(const c of (node.children||[])){ const r=findNode(c,id); if(r) return r; } return null; }
+function parentOf(node,id){ if(!node||!node.children) return null; for(const c of node.children){ if(c.id===id) return node; const r=parentOf(c,id); if(r) return r; } return null; }
+function moveNode(nodeId, newParentId){
+  if(nodeId===newParentId) return;
+  const node = findNode(vault, nodeId);
+  const oldP = parentOf(vault, nodeId);
+  const newP = findNode(vault, newParentId);
+  if(!node || !newP || !Array.isArray(newP.children)) return;
+  let cur=newP; while(cur){ if(cur.id===nodeId) return; cur = parentOf(vault, cur.id); }
+  if(oldP && oldP.children) oldP.children = oldP.children.filter(c=>c.id!==nodeId);
+  newP.children.push(node);
+  saveAll(); render();
+}
+
+/* ---- cross-link helpers ---- */
+function allPages(node=vault, arr=[]){ if(node.type==='page') arr.push({id:node.id,name:node.name}); (node.children||[]).forEach(c=>allPages(c,arr)); return arr; }
+function pageByName(name){ const needle=(name||'').trim().toLowerCase(); return allPages().find(p=>p.name.trim().toLowerCase()===needle); }
+function ensureHeadingIds(root=ed){
+  const hs=root.querySelectorAll('h1,h2,h3,h4,h5');
+  hs.forEach(h=>{
+    if(!h.id){
+      const base=(h.textContent||'').trim();
+      const baseSlug = slug(base)||('h'+Math.random().toString(36).slice(2,7));
+      let i=2, candidate=baseSlug;
+      while(root.querySelector('#'+CSS.escape(candidate))) candidate=baseSlug+'-'+i++;
+      h.id=candidate;
+    }
+  });
+}
+
+// Make headings collapsible
+function makeHeadingsCollapsible(){
+  ed.querySelectorAll('h1,h2,h3,h4,h5').forEach(h=>{
+    if(h.classList.contains('collapse-setup')) return;
+    h.classList.add('collapse-setup');
+    h.style.cursor='pointer';
+    h.onclick=()=>{
+      const level = parseInt(h.tagName[1]);
+      let next = h.nextElementSibling;
+      const collapsed = h.classList.toggle('collapsed');
+      
+      while(next){
+        if(next.tagName && next.tagName.match(/^H[1-5]$/)){
+          const nextLevel = parseInt(next.tagName[1]);
+          if(nextLevel <= level) break;
+        }
+        next.style.display = collapsed ? 'none' : '';
+        next = next.nextElementSibling;
+      }
+    };
+  });
+}
+
+/* ---- backlinks ---- */
+function allVaultPages(node=vault, list=[]){ if(node.type==='page') list.push(node); (node.children||[]).forEach(c=>allVaultPages(c,list)); return list; }
+function findBacklinksFor(pageId){
+  const page = findNode(vault, pageId);
+  if(!page) return [];
+  const title = (page.name||'').trim();
+  if(!title) return [];
+  const esc = title.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const re = new RegExp(`\\b${esc}\\b`,'i');
+  const hits=[];
+  allVaultPages().forEach(p=>{
+    if(p.id===pageId) return;
+    const html = getContent(p.id)||'';
+    const txt = html.replace(/<[^>]+>/g,' ');
+    if(re.test(txt)){
+      const idx = txt.toLowerCase().indexOf(title.toLowerCase());
+      const start = Math.max(0, idx-40);
+      const end   = Math.min(txt.length, idx+title.length+40);
+      const snip = (txt.slice(start,end)).replace(/\\s+/g,' ').trim();
+      hits.push({id:p.id, name:p.name, snippet:snip});
+    }
+  });
+  hits.sort((a,b)=>a.name.localeCompare(b.name));
+  return hits;
+}
+function renderBacklinks(){
+  const host = document.getElementById('backlinksBody');
+  if(!host || !sel) return;
+  const hits = findBacklinksFor(sel);
+  if(!hits.length){ host.innerHTML='<em>No backlinks.</em>'; return; }
+  host.innerHTML = hits.map(h=>`
+    <div class="bl-item" data-id="${h.id}">
+      <div class="bl-title">${h.name}</div>
+      <div class="bl-snippet">${h.snippet}</div>
+    </div>`).join('');
+  host.querySelectorAll('.bl-item').forEach(el=>{
+    el.onclick=()=>{ const id=el.getAttribute('data-id'); if(id) select(id,true); };
+  });
+}
+
+/* ---- Highlight page name matches (not clickable yet) ---- */
+function highlightPageMatches(){
+  // Remove ONLY old page-match highlights, keep xref links
+  ed.querySelectorAll('span.page-match').forEach(s=>{ s.replaceWith(document.createTextNode(s.textContent)); });
+  
+  const titles = allPages().map(p=>p.name).filter(Boolean).sort((a,b)=>b.length-a.length);
+  if(!titles.length) return;
+
+  const walker=document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, {
+    acceptNode(node){
+      if(!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if(node.parentElement.closest('.page-match,.xref,.xref,table,thead,button')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const textNodes=[];
+  while(walker.nextNode()) textNodes.push(walker.currentNode);
+
+  const esc = s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const reTitles = new RegExp('\\b(' + titles.map(esc).join('|') + ')\\b','gi');
+
+  textNodes.forEach(node=>{
+    let m, idx=0, parent=node.parentNode, txt=node.nodeValue;
+    if(!parent || !txt) return;
+    const frag=document.createDocumentFragment();
+    reTitles.lastIndex = 0;
+    while((m=reTitles.exec(txt))!==null){
+      const before=txt.slice(idx,m.index);
+      if(before) frag.appendChild(document.createTextNode(before));
+      const span=document.createElement('span'); 
+      span.className='page-match'; 
+      span.textContent=m[0];
+      span.dataset.matchText = m[0];
+      frag.appendChild(span);
+      idx = m.index + m[0].length;
+    }
+    const after=txt.slice(idx);
+    if(idx > 0) { // Only replace if we found matches
+      if(after) frag.appendChild(document.createTextNode(after));
+      parent.replaceChild(frag, node);
+    }
+  });
+  
+  // Add click handlers to existing links
+  attachLinkHandlers();
+}
+
+function attachLinkHandlers(){
+  ed.querySelectorAll('.xref').forEach(el=>{
+    el.onclick=()=>{ const id=el.dataset.pid; if(!id) return; select(id,true); };
+  });
+}
+
+/* ---- Make selected word a link everywhere ---- */
+function makeWordLink(word){
+  if(!word) return;
+  const page = pageByName(word);
+  if(!page){ alert(`No page named "${word}" found.`); return; }
+  
+  console.log('Making link for:', word, 'to page:', page.name);
+  
+  // Convert all instances to links across ALL pages
+  allVaultPages().forEach(p=>{
+    const k=CT+':'+p.id;
+    let html=localStorage.getItem(k)||'';
+    if(!html) return;
+    
+    const temp=document.createElement('div');
+    temp.innerHTML=html;
+    
+    // First convert page-match spans
+    temp.querySelectorAll('span.page-match').forEach(span=>{
+      if(span.textContent.toLowerCase()===word.toLowerCase()){
+        const link=document.createElement('span');
+        link.className='xref';
+        link.textContent=span.textContent;
+        link.dataset.pid=page.id;
+        span.replaceWith(link);
+      }
+    });
+    
+    // Then convert plain text instances
+    const walker=document.createTreeWalker(temp, NodeFilter.SHOW_TEXT, {
+      acceptNode(node){
+        if(!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        if(node.parentElement.closest('.xref,table,thead,button,h1,h2,h3,h4,h5')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const textNodes=[];
+    while(walker.nextNode()) textNodes.push(walker.currentNode);
+    
+    const esc = word.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re = new RegExp('\\b('+esc+')\\b','gi');
+    
+    textNodes.forEach(node=>{
+      let m, idx=0, parent=node.parentNode, txt=node.nodeValue;
+      const frag=document.createDocumentFragment();
+      re.lastIndex = 0;
+      let hasMatch = false;
+      while((m=re.exec(txt))!==null){
+        hasMatch = true;
+        const before=txt.slice(idx,m.index);
+        if(before) frag.appendChild(document.createTextNode(before));
+        const span=document.createElement('span'); 
+        span.className='xref'; 
+        span.textContent=m[0];
+        span.dataset.pid=page.id;
+        frag.appendChild(span);
+        idx = m.index + m[0].length;
+      }
+      if(hasMatch) {
+        const after=txt.slice(idx);
+        if(after) frag.appendChild(document.createTextNode(after));
+        parent.replaceChild(frag, node);
+      }
+    });
+    
+    localStorage.setItem(k, temp.innerHTML);
+    console.log('Updated page:', p.name);
+  });
+  
+// Force refresh current page
+  if(sel){
+    const n=findNode(vault,sel);
+    if(n?.type==='page'){
+      const savedHTML = getContent(sel);
+      console.log('Reloading current page with:', savedHTML.substring(0, 200));
+      ed.innerHTML = savedHTML || '<p></p>';
+      ensureHeadingIds();
+      makeHeadingsCollapsible();
+      highlightPageMatches();
+      attachLinkHandlers(); // Make sure link handlers are attached
+      renderBacklinks();
+    }
+  }
+  
+  alert(`"${word}" is now linked everywhere!`);
+}
+
+function positionPreview(x,y){
+  const mw=420, mh=340; let px=x+14, py=y+14;
+  if(px+mw>window.innerWidth) px=window.innerWidth-mw-10;
+  if(py+mh>window.innerHeight) py=window.innerHeight-mh-10;
+  previewEl.style.left=px+'px'; previewEl.style.top=py+'px';
+}
+
+/* ---- Backlinks + search update on select ---- */
+function select(id,loadPage){
+  const n=findNode(vault,id);
+  setSel(id);
+  render();
+  if(n.type==='page' && loadPage){
+    const content = getContent(id);
+    ed.innerHTML = content || '<p><br></p>';
+    ed.contentEditable='true';
+    titleEl.textContent=n.name;
+    ensureHeadingIds();
+    makeHeadingsCollapsible();
+    highlightPageMatches();
+    renderBacklinks();
+    clearHighlights(ed);
+    findMatches=[]; findIndex=-1;
+    
+    // Place cursor at start
+    setTimeout(()=>{
+      ed.focus();
+      const range = document.createRange();
+      const sel = window.getSelection();
+      if(ed.firstChild){
+        range.setStart(ed.firstChild, 0);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }, 10);
+  }
+}
+
+/* ---- Render tree ---- */
+function hasMatch(n,f){ if(n.name.toLowerCase().includes(f)) return true; return (n.children||[]).some(c=>hasMatch(c,f)); }
+function render(){
+  treeEl.innerHTML='';
+  vault.children
+    .filter(x=>!filter||x.name.toLowerCase().includes(filter)||hasMatch(x,filter))
+    .sort((a,b)=> (a.type===b.type?0:a.type==='folder'?-1:1) || a.name.localeCompare(b.name))
+    .forEach(node=>{
+      if(node.type==='folder' && node.top){
+        treeEl.appendChild(renderGroup(node));
+      }else{
+        let g=$('#_defaultGroup');
+        if(!g){
+          g=document.createElement('div'); g.className='group'; g.id='_defaultGroup';
+          const gh=document.createElement('div'); gh.className='group-head';
+          const gn=document.createElement('div'); gn.className='group-name'; gn.textContent='Other';
+          gh.appendChild(gn); g.appendChild(gh);
+          const body=document.createElement('div'); body.className='group-body'; g.appendChild(body);
+          treeEl.appendChild(g);
+        }
+        g.querySelector('.group-body').appendChild(renderNode(node));
+      }
+    });
+}
+function renderGroup(folder){
+  const g=document.createElement('div'); g.className='group'+(folder.collapsed?' collapsed':'');
+  const head=document.createElement('div'); head.className='group-head'; head.dataset.id=folder.id; head.dataset.type='section';
+  const name=document.createElement('div'); name.className='group-name'; name.textContent=folder.name;
+  head.appendChild(name); g.appendChild(head);
+  const body=document.createElement('div'); body.className='group-body';
+  body.appendChild(renderNode(folder,true));
+  g.appendChild(body);
+  head.onclick=()=>{ folder.collapsed=!folder.collapsed; saveAll(); render(); };
+  head.oncontextmenu=(e)=> openMenu(e, folder.id, 'section');
+  return g;
+}
+function renderNode(n,showChildrenOnly=false){
+  const box=document.createElement('div');
+  if(!showChildrenOnly){
+    const row=document.createElement('div'); row.className='node'+(n.id===sel?' active':'')+(n.collapsed?' collapsed':'');
+    row.dataset.id=n.id; row.dataset.type=n.top?'section':n.type;
+    row.draggable = true;
+    row.addEventListener('dragstart', (e)=>{ draggedId = n.id; e.dataTransfer.setData('text/plain', n.id); });
+    row.addEventListener('dragover', (e)=>{ if(row.dataset.type==='folder' || row.dataset.type==='section'){ e.preventDefault(); row.classList.add('drop-target'); }});
+    row.addEventListener('dragleave', ()=> row.classList.remove('drop-target'));
+    row.addEventListener('drop', (e)=>{
+      e.preventDefault(); row.classList.remove('drop-target');
+      const dropParentId = n.id;
+      if(!draggedId || draggedId===dropParentId) return;
+      if(row.dataset.type==='folder' || row.dataset.type==='section'){ moveNode(draggedId, dropParentId); }
+      draggedId = null;
+    });
+    const tri=document.createElement('div'); tri.className='t'; if(n.type==='page'){ tri.style.visibility='hidden'; }
+    const name=document.createElement('div'); name.className='name'; name.textContent=n.name;
+    row.append(tri,name);
+    if(n.type==='folder'){ row.onclick=()=>{ if(sel===n.id){ n.collapsed=!n.collapsed; saveAll(); render(); } else { select(n.id,false); } }; }
+    else { row.onclick=()=>select(n.id,true); }
+    row.oncontextmenu=(e)=> openMenu(e, n.id, row.dataset.type);
+    box.appendChild(row);
+  }
+  const kids=document.createElement('div'); kids.className='children'; if(n.collapsed) kids.style.maxHeight='0';
+  if(n.children){
+    n.children
+     .filter(c=>!filter||c.name.toLowerCase().includes(filter)||hasMatch(c,filter))
+     .sort((a,b)=> (a.type===b.type?0:a.type==='folder'?-1:1) || a.name.localeCompare(b.name))
+     .forEach(c=> kids.appendChild(renderNode(c)));
+  }
+  box.appendChild(kids);
+  return box;
+}
+
+/* ---- CRUD ---- */
+function addSection(){
+  const name=prompt('Section name?','New Section'); if(!name) return;
+  vault.children.push({id:id(),type:'folder',name:name.trim(),children:[],collapsed:false,top:true});
+  saveAll(); render();
+}
+function addFolderTo(sectionId){
+  const parent=findNode(vault,sectionId); if(!parent) return;
+  const name=prompt('Folder name?','New Folder'); if(!name) return;
+  parent.children.push({id:id(),type:'folder',name:name.trim(),children:[]});
+  saveAll(); render();
+}
+function addPageTo(folderId){
+  const parent=findNode(vault,folderId); if(!parent) return;
+  const name=prompt('Page title?','New Page'); if(!name) return;
+  const n={id:id(),type:'page',name:name.trim()};
+  parent.children.push(n); saveAll(); render(); select(n.id,true);
+}
+async function renameNode(targetId){
+  const n=findNode(vault,targetId); if(!n) return;
+  const name=prompt('Rename:',n.name); if(!name) return;
+  n.name=name.trim(); saveAll(); render();
+  if(n.type==='page'){ if(dirHandle) await savePageTxt(n); if(sel===n.id) titleEl.textContent=n.name; renderBacklinks(); }
+}
+function deleteNode(targetId){
+  const n=findNode(vault,targetId); if(!n) return;
+  const p=parentOf(vault,targetId) || vault;
+  if(!confirm(`Delete "${n.name}"${n.type!=='page'?' (and its contents)':''}?`)) return;
+  p.children=p.children.filter(x=>x.id!==targetId); saveAll();
+  if(n.type==='page'){ localStorage.removeItem(CT+':'+n.id); deletePageTxt(n); }
+  if(sel===targetId){ sel=null; setSel(sel); ed.innerHTML='<p></p>'; titleEl.textContent='No page'; }
+  render(); renderBacklinks();
+}
+
+/* ---- In-page find + global replace ---- */
+function clearHighlights(root){ root.querySelectorAll('span.hl').forEach(s=>{ s.replaceWith(document.createTextNode(s.textContent)); }); }
+function highlightInPage(q){
+  clearHighlights(ed); findMatches=[]; findIndex=-1;
+  if(!q){ return; }
+  const esc = q.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');
+  const re = new RegExp(esc,'gi');
+  const walker=document.createTreeWalker(ed, NodeFilter.SHOW_TEXT, {
+    acceptNode(n){
+      if(!n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+      if(n.parentElement.closest('.hl, .xref, .hjump, .tbl, .map-banner')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node=>{
+    let m, idx=0, txt=node.nodeValue, frag=document.createDocumentFragment(); re.lastIndex=0;
+    while((m=re.exec(txt))!==null){
+      const before = txt.slice(idx, m.index); if(before) frag.appendChild(document.createTextNode(before));
+      const span=document.createElement('span'); span.className='hl'; span.textContent=m[0]; frag.appendChild(span); findMatches.push(span);
+      idx = m.index + m[0].length;
+    }
+    const after = txt.slice(idx);
+    if(findMatches.length && (idx || after)){ if(after) frag.appendChild(document.createTextNode(after)); node.parentNode.replaceChild(frag, node); }
+  });
+}
+function gotoMatch(i){ if(!findMatches.length) return; findIndex = (i+findMatches.length) % findMatches.length; const el=findMatches[findIndex]; el.scrollIntoView({behavior:'smooth',block:'center'}); }
+q.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ const findQuery=q.value.trim(); highlightInPage(findQuery); if(findMatches.length) gotoMatch(0); }});
+$('#findPrev').onclick=()=>{ if(findMatches.length) gotoMatch(findIndex-1); };
+$('#findNext').onclick=()=>{ if(findMatches.length) gotoMatch(findIndex+1); };
+replaceBtn.onclick=()=>{
+  const needle=prompt('Find text (exact, case-sensitive)?'); if(!needle) return;
+  const repl=prompt('Replace with?',''); if(repl===null) return;
+  let changed=0;
+  (function walk(node){ (node.children||[]).forEach(c=>{ if(c.type==='page'){ const k=CT+':'+c.id; let html=localStorage.getItem(k)||''; if(html.includes(needle)){ html=html.split(needle).join(repl); localStorage.setItem(k,html); if(sel===c.id){ ed.innerHTML=html; ensureHeadingIds(); linkify(); renderBacklinks(); } changed++; } } walk(c); }); })(vault);
+  alert(`Replaced in ${changed} page(s).`);
+};
+
+/* ---- image framing ---- */
+ed.addEventListener('paste', ()=>{ setTimeout(()=>{ ed.querySelectorAll('img:not(.img-framed):not(.map-banner img)').forEach(img=> img.classList.add('img-framed')); },0); });
+
+/* ---- map banner ---- */
+function insertMapBanner(url, caption){
+  if(!url) return;
+  const fig=document.createElement('figure'); fig.className='map-banner';
+  const img=document.createElement('img'); img.src=url; fig.appendChild(img);
+  if(caption){ const cap=document.createElement('figcaption'); cap.textContent=caption; fig.appendChild(cap); }
+  const selObj=window.getSelection();
+  if(selObj && selObj.rangeCount){ const r=selObj.getRangeAt(0); r.collapse(false); r.insertNode(fig); }
+  else { ed.appendChild(fig); }
+}
+
+/* ---- Caret save/restore ---- */
+function getSelectionOffsets(root){
+  const sel = window.getSelection(); if(!sel || sel.rangeCount===0) return {start:null,end:null};
+  const range = sel.getRangeAt(0); let start=0, end=0, count=0;
+  (function walk(node){
+    if(node.nodeType===Node.TEXT_NODE){
+      const len=node.nodeValue.length;
+      if(node===range.startContainer) start = count + range.startOffset;
+      if(node===range.endContainer)   end   = count + range.endOffset;
+      count+=len;
+    }else{ for(let i=0;i<node.childNodes.length;i++) walk(node.childNodes[i]); }
+  })(root);
+  return {start,end};
+}
+function setSelectionOffsets(root, start, end){
+  if(start==null) return;
+  const sel=window.getSelection(); let range=document.createRange(); let count=0, sN=null,sO=0,eN=null,eO=0;
+  (function walk(node){
+    if(eN) return;
+    if(node.nodeType===Node.TEXT_NODE){
+      const len=node.nodeValue.length;
+      if(!sN && count+len>=start){ sN=node; sO=start-count; }
+      if(!eN && count+len>=(end ?? start)){ eN=node; eO=(end ?? start)-count; }
+      count+=len;
+    }else{ for(let i=0;i<node.childNodes.length;i++) walk(node.childNodes[i]); }
+  })(root);
+  if(!sN){ return; } if(!eN){ eN=sN; eO=sO; }
+  try{ range.setStart(sN,sO); range.setEnd(eN,eO); sel.removeAllRanges(); sel.addRange(range); }catch(e){}
+}
+
+/* ---- Editor input (debounced) ---- */
+let t=null;
+ed.addEventListener('input',()=>{
+  if(!sel) return;
+  const n=findNode(vault,sel);
+  if(n?.type!=='page') return;
+  clearTimeout(t);
+  t=setTimeout(async ()=>{
+    // Just save, don't rebuild DOM
+    if(!dirHandle) await promptForFolderOnce();
+    setContent(n.id, ed.innerHTML);
+    if(dirHandle) await savePageTxt(n);
+    makeHeadingsCollapsible(); // Re-attach handlers
+    renderBacklinks();
+  },500);
+});
+
+/* ---- Template delete buttons ---- */
+ed.addEventListener('click', (e)=>{
+  if(e.target.classList.contains('template-delete')){
+    e.preventDefault();
+    e.stopPropagation();
+    const template = e.target.parentElement;
+    if(template){
+      template.remove();
+    }
+  }
+});
+
+
+/* ---- toolbar ---- */
+document.querySelectorAll('[data-cmd]').forEach(b=> b.onclick=()=>{ document.execCommand(b.dataset.cmd,false); ed.focus(); });
+$('#dot').onclick=()=>{ document.execCommand('insertUnorderedList',false); ed.focus(); };
+document.querySelectorAll('[data-h]').forEach(b=> b.onclick=()=>{ document.execCommand('formatBlock',false,b.dataset.h); ed.focus(); });
+$('#tableBtn').onclick=()=>{ insertTable(3,3); ed.focus(); };
+/* ---- Callout boxes ---- */
+$('#clueBtn').onclick=()=>{ insertCallout('clue'); ed.focus(); };
+$('#questionBtn').onclick=()=>{ insertCallout('question'); ed.focus(); };
+$('#observeBtn').onclick=()=>{ insertCallout('observe'); ed.focus(); };
+
+function insertCallout(type){
+  const div=document.createElement('div');
+  div.className='callout callout-'+type;
+  const delBtn = '<span class="template-delete" contenteditable="false">×</span>';
+  if(type==='observe'){
+    div.innerHTML=delBtn+'<div class="callout-observe-header"><span class="callout-observe-dc" contenteditable="true">DC 15</span></div><p contenteditable="true">Enter your text here...</p>';
+  } else {
+    div.innerHTML=delBtn+'<p contenteditable="true">Enter your text here...</p>';
+  }
+  insertNodeAtCaret(div);
+  
+  // Add empty paragraph after template
+  setTimeout(()=>{
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>';
+    if(div.parentNode){
+      div.parentNode.insertBefore(emptyP, div.nextSibling);
+    }
+  }, 10);
+}
+
+/* ---- Skill Challenge template ---- */
+$('#scBtn').onclick=()=>{ insertSkillChallenge(); ed.focus(); };
+
+function insertSkillChallenge(){
+  const div=document.createElement('div');
+  div.className='skill-challenge';
+div.innerHTML=`
+    <span class="template-delete" contenteditable="false">×</span>
+    <div class="sc-title" contenteditable="true">Challenge Name</div>
+    <div class="sc-counters">
+      <div class="sc-counter">
+        <div class="sc-counter-label">Successes</div>
+        <div class="sc-counter-value" contenteditable="true">0 / 3</div>
+      </div>
+      <div class="sc-counter">
+        <div class="sc-counter-label">Failures</div>
+        <div class="sc-counter-value" contenteditable="true">0 / 3</div>
+      </div>
+    </div>
+    <div class="sc-skills">
+      <div class="sc-skill-row">
+        <div class="sc-skill-name" contenteditable="true">Athletics</div>
+        <div class="sc-skill-desc" contenteditable="true">Climb the wall quickly</div>
+      </div>
+      <div class="sc-skill-row">
+        <div class="sc-skill-name" contenteditable="true">Acrobatics</div>
+        <div class="sc-skill-desc" contenteditable="true">Balance across narrow ledges</div>
+      </div>
+      <div class="sc-skill-row">
+        <div class="sc-skill-name" contenteditable="true">Persuasion</div>
+        <div class="sc-skill-desc" contenteditable="true">Convince the guard to help</div>
+      </div>
+    </div>
+    <div class="sc-outcome sc-outcome-success">
+      <div class="sc-outcome-title">Success</div>
+      <div class="sc-outcome-text" contenteditable="true">The party reaches the summit before nightfall...</div>
+    </div>
+    <div class="sc-outcome sc-outcome-failure">
+      <div class="sc-outcome-title">Failure</div>
+      <div class="sc-outcome-text" contenteditable="true">They arrive exhausted and wounded...</div>
+    </div>
+  `;
+  insertNodeAtCaret(div);
+  
+  // Add empty paragraph after template
+  setTimeout(()=>{
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>';
+    if(div.parentNode){
+      div.parentNode.insertBefore(emptyP, div.nextSibling);
+    }
+  }, 10);
+}
+
+/* ---- NPC Card template ---- */
+$('#npcBtn').onclick=()=>{ insertNPCCard(); ed.focus(); };
+
+function insertNPCCard(){
+  const div=document.createElement('div');
+  div.className='npc-card';
+  div.innerHTML=`
+    <span class="template-delete" contenteditable="false">×</span>
+    <div class="npc-name" contenteditable="true">NPC Name</div>
+    <ul class="npc-quotes">
+      <li contenteditable="true">"I've seen things you wouldn't believe..."</li>
+      <li contenteditable="true">"The old mill? Nobody goes there anymore."</li>
+      <li contenteditable="true">"You look like you could use a hot meal."</li>
+    </ul>
+  `;
+  insertNodeAtCaret(div);
+  
+  setTimeout(()=>{
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>';
+    if(div.parentNode){
+      div.parentNode.insertBefore(emptyP, div.nextSibling);
+    }
+  }, 10);
+}
+
+/* ---- Combat Encounter template ---- */
+
+/* ---- Combat Encounter template ---- */
+$('#combatBtn').onclick=()=>{ insertCombatEncounter(); ed.focus(); };
+
+function insertCombatEncounter(){
+  const div=document.createElement('div');
+  div.className='combat-encounter';
+div.innerHTML=`
+    <span class="template-delete" contenteditable="false">×</span>
+    <div class="combat-title" contenteditable="true">Encounter Name</div>
+    <div class="combat-flavor" contenteditable="true">Read-aloud flavor text for the players...</div>
+    <div class="combat-section-label">Enemies</div>
+    <div class="combat-enemies" contenteditable="true">3x Bandits, 1x Bandit Captain</div>
+    <div class="combat-section-label">Round Events</div>
+    <div class="combat-rounds" contenteditable="true">Round 3: Reinforcements arrive from the east</div>
+  `;
+  insertNodeAtCaret(div);
+  
+  setTimeout(()=>{
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>';
+    if(div.parentNode){
+      div.parentNode.insertBefore(emptyP, div.nextSibling);
+    }
+  }, 10);
+}
+
+/* ---- Loot Table template ---- */
+$('#lootBtn').onclick=()=>{ insertLootTable(); ed.focus(); };
+
+function insertLootTable(){
+  const div=document.createElement('div');
+  div.className='loot-table';
+div.innerHTML=`
+    <span class="template-delete" contenteditable="false">×</span>
+    <div class="loot-title">Loot Table</div>
+    <div class="loot-row">
+      <div class="loot-roll" contenteditable="true">1-5</div>
+      <div class="loot-item" contenteditable="true">Gold Coins</div>
+      <div class="loot-desc" contenteditable="true">2d6 x 10 gold pieces</div>
+    </div>
+    <div class="loot-row">
+      <div class="loot-roll" contenteditable="true">6-12</div>
+      <div class="loot-item" contenteditable="true">Healing Potion</div>
+      <div class="loot-desc" contenteditable="true">Restores 2d4+2 HP</div>
+    </div>
+    <div class="loot-row">
+      <div class="loot-roll" contenteditable="true">13-20</div>
+      <div class="loot-item" contenteditable="true">Magic Scroll</div>
+      <div class="loot-desc" contenteditable="true">Random 1st level spell</div>
+    </div>
+  `;
+  insertNodeAtCaret(div);
+  
+  setTimeout(()=>{
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>';
+    if(div.parentNode){
+      div.parentNode.insertBefore(emptyP, div.nextSibling);
+    }
+  }, 10);
+}
+
+/* ---- Encounter Table template ---- */
+$('#encounterBtn').onclick=()=>{ insertEncounterTable(); ed.focus(); };
+
+function insertEncounterTable(){
+  const div=document.createElement('div');
+  div.className='encounter-table';
+div.innerHTML=`
+    <span class="template-delete" contenteditable="false">×</span>
+    <div class="encounter-title">Random Encounters</div>
+    <div class="encounter-row">
+      <div class="encounter-roll" contenteditable="true">1-5</div>
+      <div class="encounter-desc" contenteditable="true">Wandering merchant with rare goods</div>
+    </div>
+    <div class="encounter-row">
+      <div class="encounter-roll" contenteditable="true">6-10</div>
+      <div class="encounter-desc" contenteditable="true">Pack of wolves hunting in the area</div>
+    </div>
+    <div class="encounter-row">
+      <div class="encounter-roll" contenteditable="true">11-15</div>
+      <div class="encounter-desc" contenteditable="true">Abandoned campsite with clues</div>
+    </div>
+    <div class="encounter-row">
+      <div class="encounter-roll" contenteditable="true">16-20</div>
+      <div class="encounter-desc" contenteditable="true">Nothing of note</div>
+    </div>
+  `;
+  insertNodeAtCaret(div);
+  
+  setTimeout(()=>{
+    const emptyP = document.createElement('p');
+    emptyP.innerHTML = '<br>';
+    if(div.parentNode){
+      div.parentNode.insertBefore(emptyP, div.nextSibling);
+    }
+  }, 10);
+}
+
+
+
+/* ---- Table helpers ---- */
+function insertTable(rows, cols){
+  const table=document.createElement('table'); table.className='tbl';
+  const thead=document.createElement('thead'); const trh=document.createElement('tr');
+  for(let c=0;c<cols;c++){ const th=document.createElement('th'); th.textContent='Header'; trh.appendChild(th); }
+  thead.appendChild(trh); table.appendChild(thead);
+  const tbody=document.createElement('tbody');
+  for(let r=0;r<rows-1;r++){ const tr=document.createElement('tr'); for(let c=0;c<cols;c++){ const td=document.createElement('td'); td.innerHTML=''; tr.appendChild(td); } tbody.appendChild(tr); }
+  table.appendChild(tbody);
+  insertNodeAtCaret(table);
+}
+function insertNodeAtCaret(node){
+  const sel=window.getSelection(); if(!sel||!sel.rangeCount){ ed.appendChild(node); return; }
+  const range=sel.getRangeAt(0); range.deleteContents(); range.insertNode(node);
+}
+
+/* ---- Context menus ---- */
+let draggedId = null;
+let tableCellRef=null;
+function openMenu(ev, idVal, type){
+  ev.preventDefault();
+  buildMenu(idVal, type);
+  menu.style.display='block';
+  const mw=menu.offsetWidth||180, mh=menu.offsetHeight||200; let x=ev.clientX, y=ev.clientY;
+  if(x+mw>window.innerWidth) x=window.innerWidth-mw-8;
+  if(y+mh>window.innerHeight) y=window.innerHeight-mh-8;
+  menu.style.left=(x<0?0:x)+'px'; menu.style.top=(y<0?0:y)+'px';
+}
+function openTableMenu(ev, cell){
+  ev.preventDefault();
+  buildMenu(null, 'cell');
+  menu.style.display='block';
+  const mw=menu.offsetWidth||180, mh=menu.offsetHeight||200; let x=ev.clientX, y=ev.clientY;
+  if(x+mw>window.innerWidth) x=window.innerWidth-mw-8;
+  if(y+mh>window.innerHeight) y=window.innerHeight-mh-8;
+  menu.style.left=(x<0?0:x)+'px'; menu.style.top=(y<0?0:y)+'px';
+}
+function cellCoords(cell){
+  const row=cell.parentElement; const section=row.parentElement; const table=section.parentElement;
+  const rows=Array.from(section.children); const rIndex=rows.indexOf(row); const cIndex=Array.from(row.children).indexOf(cell);
+  const isHead=(section.tagName==='THEAD'); return {table, section, row, rIndex, cIndex, isHead};
+}
+function tableAddRow(cell, where){
+  const {table, section, row, isHead} = cellCoords(cell);
+  const targetSection = isHead ? table.querySelector('tbody') || table.appendChild(document.createElement('tbody')) : section;
+  const cols = row.children.length; const tr=document.createElement('tr');
+  for(let i=0;i<cols;i++){ const el=isHead?document.createElement('th'):document.createElement('td'); tr.appendChild(el); }
+  if(where==='above'){ if(isHead){ targetSection.insertBefore(tr, targetSection.firstChild); } else { targetSection.insertBefore(tr, row); } }
+  else { if(isHead){ targetSection.insertBefore(tr, targetSection.firstChild); } else { row.nextSibling?targetSection.insertBefore(tr,row.nextSibling):targetSection.appendChild(tr); } }
+}
+function tableDelRow(cell){
+  const {section,row,isHead}=cellCoords(cell);
+  if(isHead){ section.removeChild(row); } else { if(section.children.length<=1) return; section.removeChild(row); }
+}
+function tableAddCol(cell, where){
+  const {table, cIndex} = cellCoords(cell); const delta=(where==='left')?0:1;
+  const thead=table.querySelector('thead'); const bodies=table.querySelectorAll('tbody');
+  if(thead){ for(const tr of thead.rows){ const th=document.createElement('th'); tr.insertBefore(th, tr.children[cIndex+delta]||null); } }
+  for(const tbody of bodies){ for(const tr of tbody.rows){ const td=document.createElement('td'); tr.insertBefore(td, tr.children[cIndex+delta]||null); } }
+}
+function tableDelCol(cell){
+  const {table, cIndex} = cellCoords(cell);
+  const firstRow=table.querySelector('tr'); if(!firstRow || firstRow.children.length<=1) return;
+  const thead=table.querySelector('thead'); if(thead){ for(const tr of thead.rows){ if(tr.children[cIndex]) tr.removeChild(tr.children[cIndex]); } }
+  for(const tbody of table.querySelectorAll('tbody')){ for(const tr of tbody.rows){ if(tr.children[cIndex]) tr.removeChild(tr.children[cIndex]); } }
+}
+function tableDelete(cell){ const {table}=cellCoords(cell); table.remove(); }
+function buildMenu(idVal, type){
+  menu.innerHTML=''; const addBtn=(label,fn)=>{ const b=document.createElement('button'); b.textContent=label; b.onclick=()=>{ hideMenu(); fn(); }; menu.appendChild(b); };
+  if(type==='section'){ addBtn('Add Folder', ()=>addFolderTo(idVal)); addBtn('Rename', ()=>renameNode(idVal)); addBtn('Delete Section', ()=>deleteNode(idVal)); }
+  else if(type==='folder'){ addBtn('Add Page', ()=>addPageTo(idVal)); addBtn('Rename', ()=>renameNode(idVal)); addBtn('Delete Folder', ()=>deleteNode(idVal)); }
+  else if(type==='page'){ addBtn('Rename', ()=>renameNode(idVal)); addBtn('Delete Page', ()=>deleteNode(idVal)); }
+  else if(type==='cell'){ addBtn('Row: Add Above', ()=>tableAddRow(tableCellRef,'above')); addBtn('Row: Add Below', ()=>tableAddRow(tableCellRef,'below')); addBtn('Row: Delete', ()=>tableDelRow(tableCellRef));
+    const sep=document.createElement('button'); sep.textContent='— Column —'; sep.disabled=true; menu.appendChild(sep);
+    addBtn('Col: Add Left', ()=>tableAddCol(tableCellRef,'left')); addBtn('Col: Add Right', ()=>tableAddCol(tableCellRef,'right')); addBtn('Col: Delete', ()=>tableDelCol(tableCellRef));
+    addBtn('Delete Table', ()=>tableDelete(tableCellRef)); }
+}
+addEventListener('resize', ()=>{ if(menu.style.display==='block'){ hideMenu(); } });
+function hideMenu(){ menu.style.display='none'; }
+document.addEventListener('click', ()=>{ if(previewTimer){ clearTimeout(previewTimer); previewTimer=null; } previewEl.style.display='none'; });
+document.addEventListener('contextmenu', (e)=>{ if(!e.target.closest('.node,.group-head,.tbl,.editor')) hideMenu(); });
+
+/* Right-click in editor: Map banner or Make Link */
+document.getElementById('pad').addEventListener('contextmenu', (ev)=>{
+  const table = ev.target.closest('.tbl');
+  if(table){
+    let cell = ev.target.closest('th, td') || table.querySelector('td, th');
+    if(!cell) return;
+    tableCellRef = cell; openTableMenu(ev, cell); return;
+  }
+  ev.preventDefault(); menu.innerHTML='';
+  
+  // Check if clicked on a page-match
+  const match = ev.target.closest('.page-match');
+  if(match){
+    const word = match.dataset.matchText || match.textContent;
+    const b1=document.createElement('button'); 
+    b1.textContent=`Make "${word}" a Link Everywhere`;
+    b1.onclick=()=>{ hideMenu(); makeWordLink(word); };
+    menu.appendChild(b1);
+  }
+  
+  const b2=document.createElement('button'); b2.textContent='Insert Map Banner…';
+  b2.onclick=()=>{ hideMenu(); const url=prompt('Map image URL (https://)…'); if(!url) return; const cap=prompt('Optional caption:',''); insertMapBanner(url,cap||''); };
+  menu.appendChild(b2);
+  
+  menu.style.display='block';
+  const mw=menu.offsetWidth||180, mh=menu.offsetHeight||80; let x=ev.clientX, y=ev.clientY;
+  if(x+mw>window.innerWidth) x=window.innerWidth-mw-8;
+  if(y+mh>window.innerHeight) y=window.innerHeight-mh-8;
+  if(x<0) x=0; if(y<0) y=0;
+  menu.style.left=x+'px'; menu.style.top=y+'px';
+});
+
+/* ---- Filters & controls ---- */
+q.addEventListener('input',e=>{ filter=e.target.value.trim().toLowerCase(); render(); });
+$('#addSection').onclick=addSection;
+
+/* ---- First run ---- */
+if(!load(KEY)){
+  vault.children.push({id:id(),type:'folder',name:'Prep',children:[
+    {id:id(),type:'folder',name:'Act I',children:[
+      {id:id(),type:'page',name:'Session 01 – The Village'},
+      {id:id(),type:'page',name:'NPCs – Inn & Guards'}
+    ]},
+    {id:id(),type:'folder',name:'Bestiary',children:[
+      {id:id(),type:'page',name:'Fiend – Night Swamp'}
+    ]}
+  ],top:true});
+  saveAll();
+}
+render();
+/* restore last selection or choose first page */
+(function restore(){
+  const n=sel && findNode(vault,sel);
+  if(n && n.type==='page'){ select(n.id,true); return; }
+  (function pick(node){ if(node.type==='page'){ select(node.id,true); return true } return (node.children||[]).some(pick) })(vault) || (titleEl.textContent='No page');
+})();
+</script>
+</body>
+</html>

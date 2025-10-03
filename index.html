@@ -485,13 +485,14 @@ ul,li{margin:0;padding:0;list-style:none}
 </head>
 <body>
   <aside class="sidebar">
-    <div class="header">
-      <div class="title">Journal</div>
-      <div class="ctrls">
-        <button class="btn" id="addSection">+ Section</button>
-        <button class="btn" id="globalReplace">Replace…</button>
-      </div>
-    </div>
+<div class="header">
+  <div class="title">Journal</div>
+  <div class="ctrls">
+    <button class="btn" id="installBtn" style="display:none">📥 Install</button>
+    <button class="btn" id="addSection">+ Section</button>
+    <button class="btn" id="globalReplace">Replace…</button>
+  </div>
+</div>
     <div class="search">
       <input id="q" placeholder="Search titles…  (Use Enter to find in page)">
       <div style="display:flex;gap:.35rem;margin-top:.35rem">
@@ -1408,6 +1409,33 @@ document.getElementById('pad').addEventListener('contextmenu', (ev)=>{
 /* ---- Filters & controls ---- */
 q.addEventListener('input',e=>{ filter=e.target.value.trim().toLowerCase(); render(); });
 $('#addSection').onclick=addSection;
+
+/* ---- PWA Install ---- */
+let deferredPrompt;
+const installBtn = $('#installBtn');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = 'inline-block';
+});
+
+installBtn.onclick = async () => {
+  if (!deferredPrompt) {
+    alert('Install prompt not available. Make sure manifest.webmanifest (not .txt) and sw.js are accessible at the root of your site.');
+    return;
+  }
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  console.log(`User response: ${outcome}`);
+  deferredPrompt = null;
+  installBtn.style.display = 'none';
+};
+
+window.addEventListener('appinstalled', () => {
+  console.log('PWA installed');
+  installBtn.style.display = 'none';
+});
 
 /* ---- First run ---- */
 if(!load(KEY)){

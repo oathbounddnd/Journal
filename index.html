@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Journal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="manifest" href="manifest.webmanifest">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#0a0a0a">
 <style>
@@ -1457,6 +1458,13 @@ render();
   if(n && n.type==='page'){ select(n.id,true); return; }
   (function pick(node){ if(node.type==='page'){ select(node.id,true); return true } return (node.children||[]).some(pick) })(vault) || (titleEl.textContent='No page');
 })();
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(() => console.log('Service Worker registered'))
+    .catch(err => console.error('Service Worker registration failed:', err));
+}
 </script>
 </body>
 </html>
